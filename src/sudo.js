@@ -491,12 +491,38 @@ for(var r=1; r<=9; r++){
 /********************************** Tech code ********************************/
 
 S.techs = {
-	check: function(sud,ingr){
+	check: function(sud,ingr,recipe){
+		for(var r in recipe){
+			if (!ingr[r]){
+				throw Error("Some ingredients are missing!");
+			}
+			if (recipe[r].type === "square"){
+				if (recipe[r].min && recipe[r].min > ingr[r].sqrs.length){
+					throw Error("Some ingredients are not enough!");
+				}
+				if (recipe[r].max && recipe[r].max < ingr[r].sqrs.length){
+					throw Error("Some ingredients are too much!");
+				}
+			}
+		}
 		return S.C.success;
 	},
+	perform: function(sud,result){
+		if (result.answers){
+			result.answers.map(function(a){
+				S.sud.answer(sud,a[0],a[1]);
+			});
+		}
+		if (result.blocks){
+			result.blocks.map(function(a){
+				S.sud.block(sud,a[0],a[1]);
+			});
+		}
+	},
 	hiddenSingle: {
-	    ingredients: {
-		    target: {
+		description: "{square} is the only option for {cand} in its {houseType}, so it has to be {cand-echo}",
+	    recipe: {
+		    square: {
 	    		type: "singleSquare"
 		    },
 		    cand: {
@@ -506,11 +532,14 @@ S.techs = {
 			    type: "singleHouseType"
 	    	}
     	},
+		result: function(sud,ingr){
+			return {answers:[[ingr.square,ingr.cand]]};
+		},
 		perform: function(sud,ingr){
-			S.sud.answer(sud,ingr.target,ingr.cand);
+			S.sud.answer(sud,ingr.square,ingr.cand);
 		},
 		check: function(sud,ingr){
-			var sqr = sud.sqrs[ingr.target],
+			var sqr = sud.sqrs[ingr.square],
 			    house;
 			if (S.sqr.canBe(sqr,ingr.cand)!==S.C.success){
 				throw Error("Chosen square cannot be "+ingr.cand+"!");
@@ -527,7 +556,7 @@ S.techs = {
 				for(var c=1; c<=9; c++){
 					if (house.pos[c].length === 1){
 						return {
-							target: house.pos[c][0],
+							square: house.pos[c][0],
 							cand: c,
 							houseType: house.kind
 						};
@@ -537,8 +566,9 @@ S.techs = {
 		}
 	},
 	nakedSingle: {
-		ingredients: {
-		    target: {
+		description: "The only candidate for {square} is {cand}, so {target-echo} has to be {cand-echo}",
+		recipe: {
+		    square: {
 	    		type: "singleSquare"
 		    },
 		    cand: {
@@ -551,14 +581,14 @@ S.techs = {
 				    rmn = S.sqr.possibleCands(sqr);
 				if (rmn.length === 1){
 					return {
-						target: sqrid,
+						square: sqrid,
 						cand: rmn[0]
 					};
 				}
 			}
 		},
 		check: function(sud,ingr){
-			var sqr = sud.sqrs[ingr.target],
+			var sqr = sud.sqrs[ingr.square],
 			    rmn = S.sqr.possibleCands(sqr);
 			if (S.sqr.canBe(sqr,ingr.cand)!==S.C.success){
 				throw Error("Target square cannot be "+ingr.cand+"!");
@@ -568,18 +598,22 @@ S.techs = {
 			}
 			return S.C.success;
 		},
-		perform: function(sud,ingr){
-			S.sud.answer(sud,ingr.target,ingr.cand);
+		result: function(sud,ingr){
+			return {answers:[ingr.square,ingr.cand]};
 		}
 	},
 	hiddenSubset: {
-		ingredients: {
+		description: "{subset} are the only options in their {houseType} for {cands}"+
+		             "meaning other options for those candidates in the {houseType-echo} can be ruled out",
+		recipe: {
 			subset: {
 				type: "square",
+				shownum: true,
 				min: 2
 			},
 			cands: {
 				type: "cand",
+				shownum: true,
 				min: 2
 			},
 			houseType: {
@@ -609,12 +643,14 @@ S.techs = {
 			}
 			return S.C.success;
 		},
-		perform: function(sud,ingr){
+		result: function(sud,ingr){
+			var res = {blocks:[]};
 			ingr.subset.sqrs.map(function(sqrid){
 				Array.filterAll([1,2,3,4,5,6,7,8,9],ingr.cands).map(function(c){
-					S.sud.block(sud,sqrid,c,"m");
+					res.blocks.push([sqrid,c]);
 				});
 			});
+			return res;
 		},
 		find: function(sud){
 			var MAX = 5;
@@ -672,14 +708,18 @@ S.techs = {
 		}
 	},
 	nakedSubset: {
-		ingredients: {
+		description: "{subset} can only be {cands}"+
+		             "meaning other options for those candidates in the shared {houseType} can be ruled out",
+		recipe: {
 			subset: {
 				type: "square",
-				min: 2
+				min: 2,
+				shownum: true
 			},
 			cands: {
 				type: "cand",
-				min: 2
+				min: 2,
+				shownum: true
 			},
 			houseType: {
 				type: "singleHouseType"
@@ -703,13 +743,17 @@ S.techs = {
 			}
 			return S.C.success;
 		},
-		perform: function(sud,ingr){
-			othersqrs = Array.filterAll(S.house.sqrs[ingr.subset[ingr.houseType][0]],ingr.subset.sqrs);
+		result: function(sud,ingr){
+			var res = {blocks:[]},
+			    othersqrs = Array.filterAll(S.house.sqrs[ingr.subset[ingr.houseType][0]],ingr.subset.sqrs);
 			othersqrs.map(function(sqrid){
 				ingr.cands.map(function(c){
-					S.sud.block(sud,sqrid,c,"m");
+					if (S.sqr.canBe(sud.sqrs[sqrid], c) === S.C.success) {
+						res.blocks.push([sqrid,c]);
+					}
 				});
 			});
+			return res;
 		},
 		find: function(sud){
 			var MAX = 5;
@@ -768,7 +812,9 @@ S.techs = {
 		}
 	},
 	lockedCandidates: {
-		ingredients: {
+		description: "{squares} are the only options for {cand} in their {candsin}, meaning all options "+
+		             "for {cand-echo} in the intersecting {deletefrom} can be ruled out",
+		recipe: {
 			squares: {
 				type: "square",
 				min: 2,
@@ -855,23 +901,45 @@ S.techs = {
 			// nothing! :P
 			//return S.C.notfound;
 		},
-		perform: function(sud,ingr){
+		result: function(sud,ingr){
+			var res = {
+				blocks: []
+			};
 			(Array.filterAll(S.house.sqrs[ingr.squares[ingr.deletefrom][0]],S.house.sqrs[ingr.squares[ingr.candsin][0]])).map(function(sqrid){
-				S.sud.block(sud,sqrid,ingr.cand,"m");
+				if (S.sqr.canBe(sud.sqrs[sqrid],ingr.cand) === S.C.success){
+					res.blocks.push([sqrid,ingr.cand]);
+				}
 			});
-	    }
+			return res;
+		}
 	},
 	fish: {
-		ingredients: {
+		description: "{sel} are the only options for {cand} in their {orientation}, "+
+		             "meaning the other options for {cand-echo} in the intersecting {orientation-anti} "+
+					 "can be ruled out",
+		recipe: {
 			cand: {
 				type: "singleCand"
 			},
 			orientation: {
-				type: "roworcol"
+				type: "rowsorcols"
 			},
 			sel: {
 				type: "square"
 			}
+		},
+		result: function(sud,ingr){
+            var targetsqrids = [],res = {blocks:[]};
+			ingr.sel[ingr.orientation==="r"?"c":"r"].map(function(hid){
+				targetsqrids = targetsqrids.concat(S.house.sqrs[hid]);
+			});
+			targetsqrids = Array.filterAll(targetsqrids,ingr.sel.sqrs);
+			targetsqrids.map(function(sqrid){
+				if (S.sqr.canBe(sud.sqrs[sqrid],ingr.cand)===S.C.success){
+					res.blocks.push([sqrid,ingr.cand]);
+				}
+			});
+			return res;
 		},
 		check: function(sud,ingr){
 			var o = {
@@ -977,16 +1045,24 @@ S.UI = {
 		sud.pickedIngredients = {};
 	},
 	selectIngredient: function(sud, ingr){
-		if (S.techs[sud.currentTech] && S.techs[sud.currentTech].ingredients && S.techs[sud.currentTech].ingredients[ingr]) {
+		if (S.techs[sud.currentTech] && S.techs[sud.currentTech].recipe && S.techs[sud.currentTech].recipe[ingr]) {
 			sud.currentIngredient = ingr;
 			return;
 		}
 		throw "What the heck?";
 	},
 	pickIngredient: function(sud,type,id){
-		var ingr = S.techs[sud.currentTech].ingredients[sud.currentIngredient],
+		if (!sud.currentTech || !sud.currentIngredient){
+			return;
+		}
+		var ingr = S.techs[sud.currentTech].recipe[sud.currentIngredient],
 		    picked = sud.pickedIngredients[sud.currentIngredient];
 		switch(type){
+			case "houseType":
+			    if (ingr.type === "singleHouseType" || (ingr.type === "rowsorcols" && id !== "b")){
+					sud.pickedIngredients[sud.currentIngredient] = id;
+				}
+			    break;
 			case "cand":
 			    if (ingr.type === "singleCand"){
 					sud.pickedIngredients[sud.currentIngredient] = id;

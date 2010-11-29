@@ -1096,6 +1096,15 @@ TestCase("Sudoku blocker",{
 
 /******************************** Tech tests ***********************************/
 
+var ensureIngredientsInDescription = function(desc,ingr){
+	for(var i in ingr){
+		if (desc.match("{"+i+"}")===null){
+			return false;
+		}
+	}
+	return true;
+};
+
 TestCase("Tech object",{
 	"test should be defined": function(){
 		assertObject(S.techs);
@@ -1107,8 +1116,49 @@ TestCase("Tech ingredients checker",{
 		assertFunction(S.techs.check);
 	},
 	"test should return S.C.success": function(){
-		var sud = S.sud(), ingr = {};
-		assertEquals(S.C.success,S.techs.check(sud,ingr));
+		var sud = S.sud(), ingr = {}, recipe = {};
+		assertEquals(S.C.success,S.techs.check(sud,ingr,recipe));
+	},
+	"test should throw error if some ingredients are missing": function(){
+		var sud = S.sud(), ingr = {foo:"bar"}, recipe = {foo:{type:"moo"},baz:{type:"wee"}};
+		assertException(function(){
+			S.techs.check(sud, ingr, recipe);
+		});
+	},
+	"test should throw error if collection has too few members": function(){
+		var sud = S.sud(),
+		    recipe = {foo:{type:"square",min:3}},
+			ingr = {};
+		ingr.foo = S.sel(sud,["r1c1b1","r1c2b1"]);
+		assertException(function(){
+			S.techs.check(sud, ingr, recipe);
+		});
+	},
+	"test should throw error if collection has too many members": function(){
+		var sud = S.sud(),
+		    recipe = {foo:{type:"square",max:2}},
+			ingr = {};
+		ingr.foo = S.sel(sud,["r1c1b1","r1c2b1","r1c3b1"]);
+		assertException(function(){
+			S.techs.check(sud, ingr, recipe);
+		});
+	}
+});
+
+TestCase("Tech performer",{
+	"test should be defined": function(){
+		assertFunction(S.techs.perform);
+	},
+	"test should perform answers in result obj": function(){
+		var sud = S.sud(), res = {answers:[["r1c1b1",1]]};
+		S.techs.perform(sud,res);
+		assertEquals(1,sud.sqrs.r1c1b1.ac);
+		assertEquals(S.C.hasblock,S.sqr.canBe(sud.sqrs.r1c2b1,1));
+	},
+	"test should perform blocks in result obj": function(){
+		var sud = S.sud(), res = {blocks:[["r1c1b1",1]]};
+		S.techs.perform(sud,res);
+		assertEquals(S.C.hasblock,S.sqr.canBe(sud.sqrs.r1c1b1,1));
 	}
 });
 
@@ -1118,10 +1168,16 @@ TestCase("Hidden single tech",{
 	"test should be defined": function(){
 		assertObject(S.techs.hiddenSingle);
 	},
-	"test should have selection ingredients object": function(){
-		var spec = S.techs.hiddenSingle.ingredients,
+	"test should have description": function(){
+		assertString(S.techs.hiddenSingle.description);
+	},
+	"test description should contain r": function(){
+		assertTrue(ensureIngredientsInDescription(S.techs.hiddenSingle.description,S.techs.hiddenSingle.recipe));
+	},
+	"test should have selection recipe object": function(){
+		var spec = S.techs.hiddenSingle.recipe,
 		    exp = {
-				target: {
+				square: {
 					type: "singleSquare"
 				},
 				cand: {
@@ -1148,7 +1204,7 @@ TestCase("Hidden single finder",{
 		var sud = S.sud("000000001000001000000000000100000000000000000000000000010000000000000000000000000"),
 		    ret = S.techs.hiddenSingle.find(sud),
 			expected = {
-				target: "r3c3b1",
+				square: "r3c3b1",
 				cand: 1,
 			    houseType: "r"
 			};
@@ -1175,7 +1231,7 @@ TestCase("Hidden single ingredients checker",{
         var sud = S.sud(),
 		    ingr = {
 				cand: 5,
-				target: "r1c1b1",
+				square: "r1c1b1",
 				houseType: "b"
 			};
 		assertException(function(){
@@ -1185,7 +1241,7 @@ TestCase("Hidden single ingredients checker",{
 	"test should return success for correct selection": function(){
         var sud = S.sud("000000001000001000000000000100000000000000000000000000010000000000000000000000000"),
 		    ingr = {
-				target: "r3c3b1",
+				square: "r3c3b1",
 				cand: 1,
 				houseType: "c"
 			},
@@ -1194,12 +1250,16 @@ TestCase("Hidden single ingredients checker",{
 	}
 });
 
-TestCase("Hidden single performer",{
+TestCase("Hidden single resulter",{
 	"test should be defined": function(){
-		assertFunction(S.techs.hiddenSingle.perform);
+		assertFunction(S.techs.hiddenSingle.result);
 	},
-	"test should answer target with cand": function(){
-		// TODO - fix with sinon, check that S.sud.answer is called with correct args
+	"test should return correct result object": function(){
+		var sud = S.sud("000000001000001000000000000100000000000000000000000000010000000000000000000000000"),
+		    ingr = S.techs.hiddenSingle.find(sud),
+			res = S.techs.hiddenSingle.result(sud,ingr), 
+		    expected = {answers:[[ingr.square,ingr.cand]]};
+		assertEquals(expected,res);
 	}
 });
 
@@ -1209,8 +1269,8 @@ TestCase("Hidden single reality checker",{
 		    ingr = S.techs.hiddenSingle.find(sud),
 			ok = S.techs.hiddenSingle.check(sud,ingr);
 		assertEquals(S.C.success,ok);
-		S.techs.hiddenSingle.perform(sud,ingr);
-		assertEquals(1,sud.sqrs.r3c3b1.ac);
+	//	S.techs.hiddenSingle.perform(sud,ingr);
+	//	assertEquals(1,sud.sqrs.r3c3b1.ac);
 	}
 });
 
@@ -1221,9 +1281,15 @@ TestCase("Naked single tech",{
 	"test should be defined": function(){
 		assertObject(S.techs.nakedSingle);
 	},
+	"test should have description": function(){
+		assertString(S.techs.nakedSingle.description);
+	},
+	"test description should contain all ingredients": function(){
+		assertTrue(ensureIngredientsInDescription(S.techs.nakedSingle.description,S.techs.nakedSingle.recipe));
+	},
 	"test should have ingredients object": function(){
-		var spec = S.techs.nakedSingle.ingredients, exp = {
-			target: {
+		var spec = S.techs.nakedSingle.recipe, exp = {
+			square: {
 				type: "singleSquare"
 			},
 			cand: {
@@ -1247,7 +1313,7 @@ TestCase("Naked single finder", {
 		var sud = S.sud("123456780000000000000000000000000000000000000000000000000000000000000000000000000"),
 		    ret = S.techs.nakedSingle.find(sud),
 			expected = {
-				target: "r1c9b3",
+				square: "r1c9b3",
 				cand: 9
 			};
 		assertEquals(expected,ret);
@@ -1262,7 +1328,7 @@ TestCase("Naked single ingredients checker",{
 		var sud = S.sud(),
 		    sqrid = "r1c1b1",
 		    ingr = {
-				target: sqrid,
+				square: sqrid,
 				cand: 1
 			};
 		S.sud.block(sud,sqrid,1,"m");
@@ -1274,7 +1340,7 @@ TestCase("Naked single ingredients checker",{
 		var sud = S.sud(),
 		    sqrid = "r1c1b1",
 		    ingr = {
-				target: sqrid,
+				square: sqrid,
 				cand: 1
 			};
 		assertException(function(){
@@ -1284,7 +1350,7 @@ TestCase("Naked single ingredients checker",{
 	"test should return success for correct selection": function(){
         var sud = S.sud("123456780000000000000000000000000000000000000000000000000000000000000000000000000"),
 		    ingr = {
-				target: "r1c9b3",
+				square: "r1c9b3",
 				cand: 9
 			},
 		    ret = S.techs.nakedSingle.check(sud,ingr);
@@ -1292,12 +1358,17 @@ TestCase("Naked single ingredients checker",{
 	}
 });
 
-TestCase("Naked single performer",{
+TestCase("Naked single resulter",{
 	"test should be defined": function(){
-		assertFunction(S.techs.nakedSingle.perform);
+		assertFunction(S.techs.nakedSingle.result);
 	},
-	"test should answer target with cand": function(){
-		// TODO - fix with sinon, check that S.sud.answer is called with correct args
+	"test should return correct result object": function(){
+		var ingr = {
+				square: "r1c9b3",
+				cand: 9
+			},
+		    expected = {answers:[ingr.square,ingr.cand]};
+		assertEquals(expected,S.techs.nakedSingle.result(S.sud(),ingr));
 	}
 });
 
@@ -1307,8 +1378,8 @@ TestCase("Naked single reality checker",{
 		    ingr = S.techs.nakedSingle.find(sud),
 			ok = S.techs.nakedSingle.check(sud,ingr);
 		assertEquals(S.C.success,ok);
-		S.techs.nakedSingle.perform(sud,ingr);
-		assertEquals(9,sud.sqrs.r1c9b3.ac);
+		//S.techs.nakedSingle.perform(sud,ingr);
+		//assertEquals(9,sud.sqrs.r1c9b3.ac);
 	}
 });
 
@@ -1318,21 +1389,29 @@ TestCase("Hidden Subset definition",{
 	"test should be defined": function(){
 		assertObject(S.techs.hiddenSubset);
 	},
-	"test should have ingredients specification": function(){
+	"test should have description": function(){
+		assertString(S.techs.hiddenSubset.description);
+	},
+	"test description should contain all ingredients": function(){
+		assertTrue(ensureIngredientsInDescription(S.techs.hiddenSubset.description,S.techs.hiddenSubset.recipe));
+	},
+	"test should have recipe specification": function(){
 		var spec = {
 			subset: {
 				type: "square",
+				shownum: true,
 				min: 2
 			},
 			cands: {
 				type: "cand",
+				shownum: true,
 				min: 2
 			},
 			houseType: {
 				type: "singleHouseType"
 			}
 		};
-		assertEquals(spec,S.techs.hiddenSubset.ingredients);
+		assertEquals(spec,S.techs.hiddenSubset.recipe);
 	}
 });
 
@@ -1411,11 +1490,11 @@ TestCase("Hidden Subset checker",{
 	}
 });
 
-TestCase("Hidden subset performer",{
+TestCase("Hidden subset resulter",{
 	"test should be defined": function(){
-		assertFunction(S.techs.hiddenSubset.perform);
+		assertFunction(S.techs.hiddenSubset.result);
 	},
-	"test should block all other cands in included square": function(){
+	"test should return correct result object": function(){
         var sud = S.sud(), ingr;
 		["r1c1b1","r1c2b1","r1c3b1","r1c4b2","r1c5b2","r1c6b2","r1c7b3"].map(function(sqrid){
 			S.sud.block(sud,sqrid,1,"m");
@@ -1426,16 +1505,9 @@ TestCase("Hidden subset performer",{
 			cands: [1,2],
 			houseType: "r"
 		};
-		S.techs.hiddenSubset.perform(sud,ingr);
-		["r1c8b3","r1c9b3"].map(function(sqrid){
-			var sqr = sud.sqrs[sqrid];
-			assertEquals(S.C.success,S.sqr.canBe(sqr,1));
-			assertEquals(S.C.success,S.sqr.canBe(sqr,2));
-			[3,4,5,6,7,8,9].map(function(c){
-				assertEquals(S.C.hasblock,S.sqr.canBe(sqr,c));
-			});
-		});
-		// TODO - check with sinon that S.sud.block was called correctly
+		var expected = {blocks:[["r1c8b3",3],["r1c8b3",4],["r1c8b3",5],["r1c8b3",6],["r1c8b3",7],["r1c8b3",8],["r1c8b3",9],
+		                        ["r1c9b3",3],["r1c9b3",4],["r1c9b3",5],["r1c9b3",6],["r1c9b3",7],["r1c9b3",8],["r1c9b3",9]]};
+		assertEquals(expected,S.techs.hiddenSubset.result(sud,ingr));
 	}
 });
 
@@ -1467,21 +1539,29 @@ TestCase("Naked subset definition",{
 	"test should be defined": function(){
 		assertObject(S.techs.nakedSubset);
 	},
-	"test should have ingredients definition": function(){
+	"test should have description": function(){
+		assertString(S.techs.nakedSubset.description);
+	},
+	"test description should contain all ingredients": function(){
+		assertTrue(ensureIngredientsInDescription(S.techs.nakedSubset.description,S.techs.nakedSubset.recipe));
+	},
+	"test should have recipe definition": function(){
 		var exp = {
 			subset: {
 				type: "square",
+				shownum: true,
 				min: 2
 			},
 			cands: {
 				type: "cand",
+				shownum: true,
 				min: 2
 			},
 			houseType: {
 				type: "singleHouseType"
 			}
 		};
-		assertEquals(exp,S.techs.nakedSubset.ingredients);
+		assertEquals(exp,S.techs.nakedSubset.recipe);
 	}
 });
 
@@ -1558,38 +1638,27 @@ TestCase("Naked subset checker",{
 	}
 });
 
-TestCase("nakedSubset performer",{
+TestCase("Naked subset resulter",{
 	"test should be defined": function(){
-		assertFunction(S.techs.nakedSubset.perform);
+		assertFunction(S.techs.nakedSubset.result);
 	},
-	"test should block the cands in all other squares in the house":function(){
-		var sud = S.sud(),
-		    sel = S.sel(),
-			cands = [1,2],
-			othercands = [3,4,5,6,7,8,9],
-			othersquares = ["r1c3b1","r1c4b2","r1c5b2","r1c6b2","r1c7b3","r1c8b3","r1c9b3"],
-			ingr;
-		othercands.map(function(c){
-			S.sud.block(sud,"r1c1b1",c,"m");
-			S.sud.block(sud,"r1c2b1",c,"m");
-		});
-		S.sel.add(sud,sel,"r1c1b1");
-		S.sel.add(sud,sel,"r1c2b1");
-		ingr = {
-			cands: [1, 2],
+	"test should return correct result object": function(){
+		var sud = S.sud(), ingr = {
+			cands: [1,2,3,4],
 			houseType: "r",
-			subset: sel
-		};
-		S.techs.nakedSubset.perform(sud,ingr);
-		othersquares.map(function(sqrid){
-            cands.map(function(c){
-                assertEquals(S.C.hasblock,S.sqr.canBe(sud.sqrs[sqrid],c));		
-			});
-			othercands.map(function(c){
-                assertEquals(S.C.success,S.sqr.canBe(sud.sqrs[sqrid],c));		
-			});
-		});
-		// TODO - ensure sud.block is called with correct args
+			subset: S.sel(sud,["r1c1b1","r1c2b1","r1c3b1","r1c4b2"])
+		},
+		expected = {
+			blocks: [
+			    ["r1c5b2",1],["r1c5b2",2],["r1c5b2",3],["r1c5b2",4],
+				["r1c6b2",1],["r1c6b2",2],["r1c6b2",3],["r1c6b2",4],
+				["r1c7b3",1],["r1c7b3",2],["r1c7b3",3],["r1c7b3",4],
+				["r1c8b3",1],["r1c8b3",2],["r1c8b3",3],["r1c8b3",4],
+				["r1c9b3",1],["r1c9b3",2],["r1c9b3",3],["r1c9b3",4]
+			]
+		},
+		result = S.techs.nakedSubset.result(sud,ingr);
+		assertEquals(expected,result);
 	}
 });
 
@@ -1630,8 +1699,8 @@ TestCase("Naked subset reality check",{
 		});
 		var ingr = S.techs.nakedSubset.find(sud);
 		assertEquals(S.C.success,S.techs.nakedSubset.check(sud,ingr));
-		S.techs.nakedSubset.perform(sud,ingr);
-		assertEquals(S.C.hasblock,S.sqr.canBe(sud.sqrs.r1c9b3,1));
+		//S.techs.nakedSubset.perform(sud,ingr);
+		//assertEquals(S.C.hasblock,S.sqr.canBe(sud.sqrs.r1c9b3,1));
 	}
 });
 
@@ -1641,7 +1710,13 @@ TestCase("Locked candidates definition",{
 	"test should be defined": function(){
 		assertObject(S.techs.lockedCandidates);
 	},
-	"test should have ingredients definition": function(){
+	"test should have description":function(){
+		assertString(S.techs.lockedCandidates.description);
+	},
+	"test description should contain all ingredients": function(){
+		assertTrue(ensureIngredientsInDescription(S.techs.lockedCandidates.description,S.techs.lockedCandidates.recipe));
+	},
+	"test should have recipe definition": function(){
 		var exp = {
 			squares: {
 				type: "square",
@@ -1658,7 +1733,7 @@ TestCase("Locked candidates definition",{
 				type: "singleHouseType"
 			}
 		};
-		assertEquals(exp,S.techs.lockedCandidates.ingredients);
+		assertEquals(exp,S.techs.lockedCandidates.recipe);
 	}
 });
 
@@ -1812,25 +1887,24 @@ TestCase("LockedCandidates finder",{
 	}
 });
 
-TestCase("Locked candidate performer",{
+TestCase("Locked candidate result",{
 	"test should be defined": function(){
-		assertFunction(S.techs.lockedCandidates.perform);
+		assertFunction(S.techs.lockedCandidates.result);
 	},
-	"test should perform ok for type2 col locked Candidates": function(){
+	"test should return correct results object": function(){
 		var sud = S.sud(),
 		    ingr = {
 				cand: 5,
 				candsin: "b",
 				deletefrom: "c",
 				squares: S.sel(sud,["r1c1b1","r2c1b1"])
+			},
+			expected = {
+				blocks: [
+				    ["r4c1b4",5],["r5c1b4",5],["r6c1b4",5],["r7c1b7",5],["r8c1b7",5],["r9c1b7",5]
+				]
 			};
-		(Array.filterAll(S.house.sqrs.b1,ingr.squares.sqrs)).map(function(sqrid){
-			S.sud.block(sud,sqrid,5,"m");
-		});
-		var ret = S.techs.lockedCandidates.perform(sud,ingr);
-		for (var i = 4; i <= 9; i++) {
-			assertEquals(S.C.hasblock, S.sqr.canBe(sud.sqrs.r4c1b4, 5));
-		}
+		assertEquals(expected,S.techs.lockedCandidates.result(sud,ingr));
 	}
 });
 
@@ -1840,19 +1914,25 @@ TestCase("fish definition",{
 	"test should be defined": function(){
 		assertObject(S.techs.fish);
 	},
-	"test should have ingredients definition": function(){
+	"test should have recipe definition": function(){
 		var ingr = {
 			cand: {
 				type: "singleCand"
 			},
 			orientation: {
-				type: "roworcol"
+				type: "rowsorcols"
 			},
 			sel: {
 				type: "square"
 			}
 		};
-		assertEquals(ingr,S.techs.fish.ingredients);
+		assertEquals(ingr,S.techs.fish.recipe);
+	},
+	"test should have description": function(){
+		assertString(S.techs.fish.description);
+	},
+	"test description should contain all ingredients": function(){
+		assertTrue(ensureIngredientsInDescription(S.techs.fish.description,S.techs.fish.recipe));
 	}
 });
 
@@ -1953,6 +2033,28 @@ TestCase("Fish finder",{
 	}
 });
 
+TestCase("Fish resulter",{
+	"test should be defined": function(){
+		assertFunction(S.techs.fish.result);
+	},
+	"test should return correct result object": function(){
+		var sud = S.sud(),
+		    ingr = {
+				cand: 5,
+				orientation: "r",
+				sel: S.sel(sud,["r1c1b1","r1c5b2","r5c1b4","r5c5b5"])
+			},
+		    expected = {
+				blocks: [
+				    ["r2c1b1",5],["r3c1b1",5],["r4c1b4",5],["r6c1b4",5],["r7c1b7",5],["r8c1b7",5],["r9c1b7",5],
+					["r2c5b2",5],["r3c5b2",5],["r4c5b5",5],["r6c5b5",5],["r7c5b8",5],["r8c5b8",5],["r9c5b8",5]
+				]
+			},
+			result = S.techs.fish.result(sud,ingr);
+		assertEquals(expected,result);
+	}
+});
+
 /******************************** UI tests ***********************************/
 
 TestCase("UI definition",{
@@ -2014,6 +2116,20 @@ TestCase("UI pickIngredient function",{
 		S.UI.pickIngredient(sud,"cand",5);
 		assertEquals({},sud.pickedIngredients);
 	},
+	"test should do nothing if no tech is selected": function(){
+        var sud = S.sud();
+		S.UI.pickIngredient(sud,"cand",5);
+		assertEquals({},sud.pickedIngredients);
+	},
+	"test should do nothing if no ingredient is selected": function(){
+        var sud = S.sud();
+		S.UI.selectTech(sud,"hiddenSingle");
+		S.UI.pickIngredient(sud,"cand",5);
+		assertEquals({},sud.pickedIngredients);
+	}
+});
+
+TestCase("UI pickIngredient receiving candidate",{
 	"test should pick singlecand correctly": function(){
 		var sud = S.sud();
 		S.UI.selectTech(sud,"hiddenSingle");
@@ -2045,13 +2161,16 @@ TestCase("UI pickIngredient function",{
 		S.UI.pickIngredient(sud,"cand",7);
 		S.UI.pickIngredient(sud,"cand",6);
 		assertEquals({cands:[5,7]},sud.pickedIngredients);
-	},
+	}
+});
+
+TestCase("UI pickIngredient receiving square",{
 	"test should pick single square corectly": function(){
 		var sud = S.sud();
 		S.UI.selectTech(sud,"hiddenSingle");
-		S.UI.selectIngredient(sud,"target");
+		S.UI.selectIngredient(sud,"square");
 		S.UI.pickIngredient(sud,"square","r1c1b1");
-		assertEquals({target:"r1c1b1"},sud.pickedIngredients);
+		assertEquals({square:"r1c1b1"},sud.pickedIngredients);
 	},
 	"test should add first square to squarecollection correctly": function(){
 		var sud = S.sud();
@@ -2080,3 +2199,19 @@ TestCase("UI pickIngredient function",{
 	}
 });
 
+TestCase("UI pickIngredient receiving houseType",{
+	"test should set singleHouseType correctly": function(){
+		var sud = S.sud();
+		S.UI.selectTech(sud,"hiddenSingle");
+		S.UI.selectIngredient(sud,"houseType");
+		S.UI.pickIngredient(sud,"houseType","r");
+		assertEquals({houseType:"r"},sud.pickedIngredients);
+	},
+	"test should set rowsorcols correctly": function(){
+		var sud = S.sud();
+		S.UI.selectTech(sud,"fish");
+		S.UI.selectIngredient(sud,"orientation");
+		S.UI.pickIngredient(sud,"houseType","r");
+		assertEquals({orientation:"r"},sud.pickedIngredients);
+	}
+});
