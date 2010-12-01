@@ -116,7 +116,22 @@ TestCase("Singleton constants",{
 	},
 	"test notfound constant should be defined": function(){
 		assertEquals("NOTFOUND",S.C.notfound);
-	}
+	}/*,
+    "test selecttech should be defined": function(){
+		assertEquals("SELECTTECH",S.C.selecttech);
+	},
+	"test selectsquare should be defined": function(){
+		assertEquals("SELECTSQUARE",S.C.selectsquare);
+	},
+    "test selectsquare should be defined": function(){
+		assertEquals("SELECTCANDIDATE",S.C.selectcandidate);
+	},
+    "test selectingredient should be defined": function(){
+		assertEquals("SELECTINGREDIENT",S.C.selectingredient);
+	},
+	"test selecthousetype should be defined": function(){
+		assertEquals("SELECTHOUSETYPE",S.C.selecthousetype);
+	}*/
 });
 
 
@@ -1162,6 +1177,155 @@ TestCase("Tech performer",{
 	}
 });
 
+TestCase("Tech ingredient describer",{
+	"test should be defined": function(){
+		assertFunction(S.techs.describeIngredient);
+	},
+	"test should return 'square' for a non-picked singleSquare type ingredient": function(){
+		var name = "square", recipe = S.techs.nakedSingle.recipe, picked = {};
+		assertEquals("SQUARE",S.techs.describeIngredient(name,recipe,picked));
+	},
+	"test should return squarename for picked singlesquare type ingredient": function(){
+		var name = "square",
+		    recipe = S.techs.nakedSingle.recipe,
+			picked = {square:"r1c1b1"};
+		assertEquals("r1c1b1",S.techs.describeIngredient(name,recipe,picked));
+	},
+	"test should return 'candidate' for a non-picked singleCandidate type ingredient": function(){
+		var name = "cand",
+		    recipe = S.techs.hiddenSingle.recipe;
+		assertEquals("CANDIDATE",S.techs.describeIngredient(name,recipe,{}));
+	},
+	"test should return candidate for picked singlecandidate type ingredient": function(){
+		var name = "cand",
+		    recipe = S.techs.nakedSingle.recipe,
+			picked = {cand:5};
+		assertEquals(5,S.techs.describeIngredient(name,recipe,picked));
+	},
+	"test should return SQUARES for empty square type ingredient": function(){
+		var name = "squares",
+		    recipe = {
+				squares: {
+					type: "square"
+				}
+			},
+			picked = {};
+		assertEquals("SQUARES",S.techs.describeIngredient(name,recipe,picked));
+	},
+	"test should commalist squares for picked square type ingredient": function(){
+		var name = "squares",
+		    recipe = {
+				squares: {
+					type: "square"
+				}
+			},
+			picked = {squares:["r1c1b1","r1c2b1","r1c3b1","r1c4b2"]};
+		assertEquals("r1c1b1,r1c2b1,r1c3b1,r1c4b2",S.techs.describeIngredient(name,recipe,picked));
+	},
+	"test should abbreviate long (more than 4) list of picked square type ingredient": function(){
+		var name = "squares",
+		    recipe = {
+				squares: {
+					type: "square"
+				}
+			},
+			picked = {squares:["r1c1b1","r1c2b1","r1c3b1","r1c4b2","r1c5b2"]};
+		assertEquals("5 squares",S.techs.describeIngredient(name,recipe,picked));
+	},
+	"test should return CANDIDATES for empty cand type ingredient": function(){
+		var name = "cands",
+		    recipe = {
+				cands: {
+					type: "cand"
+				}
+			},
+			picked = {};
+		assertEquals("CANDIDATES",S.techs.describeIngredient(name,recipe,picked));
+	},
+	"test should list picked candidates for cand type ingredient": function(){
+		var name = "cands",
+		    recipe = {
+				cands: {
+					type: "cand"
+				}
+			},
+			picked = {cands:[1,3,4,6,8]};
+		assertEquals("1,3,4,6,8",S.techs.describeIngredient(name,recipe,picked));
+	},
+	"test should return row/column/box for empty singleHouseType type ingredient": function(){
+		var name = "house",
+		    recipe = {
+				house: {
+					type: "singleHouseType"
+				}
+			},
+			picked = {};
+		assertEquals("row/column/box",S.techs.describeIngredient(name,recipe,picked));
+	},
+    "test should return rows/columns for empty singleHouseType type ingredient wiht notbox and plural flag": function(){
+		var name = "house",
+		    recipe = {
+				house: {
+					type: "singleHouseType",
+					notbox: true,
+					plural: true
+				}
+			},
+			picked = {};
+		assertEquals("rows/columns",S.techs.describeIngredient(name,recipe,picked));
+	},
+    "test should return columns/rows for empty singleHouseType type ingredient wiht notbox and plural and anti flag": function(){
+		var name = "house",
+		    recipe = {
+				house: {
+					type: "singleHouseType",
+					notbox: true,
+					plural: true,
+					anti: true
+				}
+			},
+			picked = {};
+		assertEquals("columns/rows",S.techs.describeIngredient(name,recipe,picked));
+	},
+	"test should return housename for picked singleHouseType type ingredient": function(){
+		var recipe = {
+				house1: {
+					type: "singleHouseType"
+				},
+                house2: {
+					type: "singleHouseType"
+				},
+                house3: {
+					type: "singleHouseType"
+				}
+			},
+			picked = {house1:"r",house2:"c",house3:"b"};
+		assertEquals("row",S.techs.describeIngredient("house1",recipe,picked));
+        assertEquals("column",S.techs.describeIngredient("house2",recipe,picked));
+        assertEquals("box",S.techs.describeIngredient("house3",recipe,picked));
+	},
+	"test should return pluralised housename for picked singleHouseType type ingredient with plural flag": function(){
+		var recipe = {
+				house1: {
+					type: "singleHouseType",
+					plural: true
+				},
+                house2: {
+					type: "singleHouseType",
+					plural: true
+				},
+                house3: {
+					type: "singleHouseType",
+					plural: true
+				}
+			},
+			picked = {house1:"r",house2:"c",house3:"b"};
+		assertEquals("rows",S.techs.describeIngredient("house1",recipe,picked));
+        assertEquals("columns",S.techs.describeIngredient("house2",recipe,picked));
+        assertEquals("boxes",S.techs.describeIngredient("house3",recipe,picked));
+	}
+});
+
      // лллллллллллллллллллллллллл Hidden Single ллллллллллллллллллллллллл 
 	 
 TestCase("Hidden single tech",{
@@ -1727,10 +1891,12 @@ TestCase("Locked candidates definition",{
 				type: "singleCand"
 			},
 			candsin: {
-				type: "singleHouseType"
+				type: "singleHouseType",
+				oneboxwith: "deletefrom"
 			},
 			deletefrom: {
-				type: "singleHouseType"
+				type: "singleHouseType",
+				oneboxwith: "candsin"
 			}
 		};
 		assertEquals(exp,S.techs.lockedCandidates.recipe);
@@ -1920,7 +2086,15 @@ TestCase("fish definition",{
 				type: "singleCand"
 			},
 			orientation: {
-				type: "rowsorcols"
+				type: "singleHouseType",
+				notbox: true,
+				plural: true
+			},
+			antiorientation: {
+				type: "singleHouseType",
+				notbox: true,
+				plural: true,
+				anti: "orientation"
 			},
 			sel: {
 				type: "square"
@@ -2067,15 +2241,27 @@ TestCase("UI selectTech function",{
 	"test should be defined": function(){
 		assertFunction(S.UI.selectTech);
 	},
-	"test should set sud property to chosen tech": function(){
+	"test should throw error if tech does not exist": function(){
 		var sud = S.sud(), tech="FOOBAR";
+		assertException(function(){
+		    S.UI.selectTech(sud,tech);
+	    });
+	},
+	"test should set sud property to chosen tech": function(){
+		var sud = S.sud(), tech="nakedSingle";
 		S.UI.selectTech(sud,tech);
 		assertEquals(tech,sud.currentTech);
 	},
 	"test should set sud picked ingredients prop to empty object": function(){
-		var sud = S.sud(), tech="FOOBAR";
+		var sud = S.sud(), tech="nakedSingle";
 		S.UI.selectTech(sud,tech);
 		assertEquals({},sud.pickedIngredients);
+	},
+	"test should select first ingredient in tech": function(){
+		var sud = S.sud(), tech="hiddenSingle";
+		S.UI.selectTech(sud,tech);
+		// TODO - make sure with sinon that selectIngredient is called
+		assertEquals("square",sud.currentIngredient);
 	}
 });
 
@@ -2090,7 +2276,7 @@ TestCase("UI selectIngredient function",{
 	},
 	"test should throw exception if no ingredient by that name in current tech": function(){
 		var sud = S.sud();
-		S.UI.selectTech("hiddenSingle");
+		S.UI.selectTech(sud,"hiddenSingle");
 		assertException(function(){
 			S.UI.selectIngredient(S.sud(), "FOOBAR");
 		});
@@ -2207,11 +2393,34 @@ TestCase("UI pickIngredient receiving houseType",{
 		S.UI.pickIngredient(sud,"houseType","r");
 		assertEquals({houseType:"r"},sud.pickedIngredients);
 	},
-	"test should set rowsorcols correctly": function(){
+	"test should not pick box if ingredient can't be box": function(){
 		var sud = S.sud();
 		S.UI.selectTech(sud,"fish");
 		S.UI.selectIngredient(sud,"orientation");
+		S.UI.pickIngredient(sud,"houseType","b");
+		assertEquals({},sud.pickedIngredients);
+	},
+	"test should pick other ingredient if anti is set": function(){
+		var sud = S.sud();
+		S.UI.selectTech(sud,"fish");
+		S.UI.selectIngredient(sud,"antiorientation");
 		S.UI.pickIngredient(sud,"houseType","r");
-		assertEquals({orientation:"r"},sud.pickedIngredients);
+		assertEquals({orientation:"c"},sud.pickedIngredients);
+	},
+	"test should set other ingredient to box if oneboxwith is set and nonbox is selected": function(){
+		var sud = S.sud();
+		S.UI.selectTech(sud,"lockedCandidates");
+		S.UI.selectIngredient(sud,"candsin");
+		S.UI.pickIngredient(sud,"houseType","r");
+		assertEquals({candsin:"r",deletefrom:"b"},sud.pickedIngredients);
+	},
+	"test should clear other ingredient from box if oneboxwith is set and box is selected": function(){
+		var sud = S.sud();
+		S.UI.selectTech(sud,"lockedCandidates");
+		S.UI.selectIngredient(sud,"candsin");
+		S.UI.pickIngredient(sud,"houseType","b");
+		S.UI.selectIngredient(sud,"deletefrom");
+		S.UI.pickIngredient(sud,"houseType","b");
+		assertEquals({deletefrom:"b"},sud.pickedIngredients);
 	}
 });

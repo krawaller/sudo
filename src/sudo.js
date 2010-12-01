@@ -519,6 +519,26 @@ S.techs = {
 			});
 		}
 	},
+	describeIngredient: function(name,recipe,picked){ // TODO - finish
+		var ingr = recipe[name];
+		if (ingr.type === "singleSquare"){
+			return picked[name] || "SQUARE";
+		}
+		if (ingr.type === "singleCand"){
+			return picked[name] || "CANDIDATE";
+		}
+		if (ingr.type === "square"){
+			return picked[name] && picked[name].length > 0 ? picked[name].length > 4 ? picked[name].length+" squares" : picked[name].join(",") : "SQUARES";
+		}
+		if (ingr.type === "cand"){
+			return picked[name] && picked[name].length > 0 ? picked[name].join(",") : "CANDIDATES";
+		}
+		var hnames = {r:"row",c:"column",b:"box"},
+		    hnamesplural = {r:"rows",c:"columns",b:"boxes"};
+		if (ingr.type === "singleHouseType"){
+			return picked[name] ? recipe[name].plural ? hnamesplural[picked[name]] : hnames[picked[name]] : recipe[name].notbox ? recipe[name].anti ? "columns/rows" : "rows/columns" : "row/column/box";
+		}
+	},
 	hiddenSingle: {
 		description: "{square} is the only option for {cand} in its {houseType}, so it has to be {cand-echo}",
 	    recipe: {
@@ -812,8 +832,8 @@ S.techs = {
 		}
 	},
 	lockedCandidates: {
-		description: "{squares} are the only options for {cand} in their {candsin}, meaning all options "+
-		             "for {cand-echo} in the intersecting {deletefrom} can be ruled out",
+		description: "{squares} are the only options for {cand} in their {candsin}, meaning all other options "+
+		             "in the intersecting {deletefrom} can be ruled out",
 		recipe: {
 			squares: {
 				type: "square",
@@ -824,10 +844,12 @@ S.techs = {
 				type: "singleCand"
 			},
 			candsin: {
-				type: "singleHouseType"
+				type: "singleHouseType",
+				oneboxwith: "deletefrom"
 			},
 			deletefrom: {
-				type: "singleHouseType"
+				type: "singleHouseType",
+				oneboxwith: "candsin"
 			}
 		},
 		check: function(sud,ingr){
@@ -915,14 +937,22 @@ S.techs = {
 	},
 	fish: {
 		description: "{sel} are the only options for {cand} in their {orientation}, "+
-		             "meaning the other options for {cand-echo} in the intersecting {orientation-anti} "+
+		             "meaning the other options for {cand-echo} in the intersecting {antiorientation} "+
 					 "can be ruled out",
 		recipe: {
 			cand: {
 				type: "singleCand"
 			},
 			orientation: {
-				type: "rowsorcols"
+				type: "singleHouseType",
+				notbox: true,
+				plural: true
+			},
+			antiorientation: {
+				type: "singleHouseType",
+				notbox: true,
+				plural: true,
+				anti: "orientation"
 			},
 			sel: {
 				type: "square"
@@ -1041,15 +1071,29 @@ S.techs = {
 
 S.UI = {
 	selectTech: function(sud, tech){
+		var techobj = S.techs[tech];
+		if (!techobj){
+			throw Error("Unknown tech \""+tech+"\"!");
+		}
 		sud.currentTech = tech;
 		sud.pickedIngredients = {};
-	},
-	selectIngredient: function(sud, ingr){
-		if (S.techs[sud.currentTech] && S.techs[sud.currentTech].recipe && S.techs[sud.currentTech].recipe[ingr]) {
-			sud.currentIngredient = ingr;
+		for (var i in S.techs[tech].recipe){
+			S.UI.selectIngredient(sud,i);
 			return;
 		}
-		throw "What the heck?";
+	},
+	selectIngredient: function(sud, ingr){
+		if (!sud.currentTech){
+			throw Error("No tech selected, cannot select ingredient!");
+		}
+		var techobj = S.techs[sud.currentTech];
+		if (!techobj){
+			throw Error("Current tech \""+sud.currentTech+"\" is unknown!");
+		}
+		if (!techobj.recipe[ingr]){
+			throw Error("Current tech \""+sud.currentTech+"\" doesn't use ingredient \""+ingr+"\"!");
+		}
+		sud.currentIngredient = ingr;
 	},
 	pickIngredient: function(sud,type,id){
 		if (!sud.currentTech || !sud.currentIngredient){
@@ -1059,8 +1103,23 @@ S.UI = {
 		    picked = sud.pickedIngredients[sud.currentIngredient];
 		switch(type){
 			case "houseType":
-			    if (ingr.type === "singleHouseType" || (ingr.type === "rowsorcols" && id !== "b")){
-					sud.pickedIngredients[sud.currentIngredient] = id;
+			    if (ingr.type === "singleHouseType" && !(ingr.notbox && id === "b")){
+					if (ingr.anti) {
+						sud.pickedIngredients[ingr.anti] = {r:"c",c:"r"}[id];
+					}
+					else {
+						sud.pickedIngredients[sud.currentIngredient] = id;
+						if (ingr.oneboxwith){
+							if (id != "b"){
+								sud.pickedIngredients[ingr.oneboxwith] = "b";
+							}
+							else {
+								if (sud.pickedIngredients[ingr.oneboxwith] == "b"){
+									delete sud.pickedIngredients[ingr.oneboxwith];
+								}
+							}
+						}
+					}
 				}
 			    break;
 			case "cand":
