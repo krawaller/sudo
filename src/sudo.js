@@ -1,3 +1,9 @@
+// ************* should be closure vars in the future *****
+
+var typenames = {r:"row",c:"column",b:"box"},
+    ALLCANDS = [1,2,3,4,5,6,7,8,9];
+
+
 // ************** HELPERS ***************************
 
 Object.countProperties = function(o){
@@ -494,7 +500,7 @@ S.techs = {
 	check: function(sud,ingr,recipe){
 		for(var r in recipe){
 			if (!ingr[r]){
-				throw Error("Some ingredients are missing!");
+				throw Error("Some ingredients are missing!"); // TODO - fix messages
 			}
 			if (recipe[r].type === "square"){
 				if (recipe[r].min && recipe[r].min > ingr[r].sqrs.length){
@@ -519,7 +525,7 @@ S.techs = {
 			});
 		}
 	},
-	describeIngredient: function(name,recipe,picked){ // TODO - finish
+	describeIngredient: function(name,recipe,picked){
 		var ingr = recipe[name];
 		if (ingr.type === "singleSquare"){
 			return picked[name] || "SQUARE";
@@ -536,11 +542,14 @@ S.techs = {
 		var hnames = {r:"row",c:"column",b:"box"},
 		    hnamesplural = {r:"rows",c:"columns",b:"boxes"};
 		if (ingr.type === "singleHouseType"){
+			if (ingr.anti && picked[ingr.anti]){
+				return (ingr.plural ? hnamesplural : hnames)[{r:"c",c:"r"}[picked[ingr.anti]]];
+			}
 			return picked[name] ? recipe[name].plural ? hnamesplural[picked[name]] : hnames[picked[name]] : recipe[name].notbox ? recipe[name].anti ? "columns/rows" : "rows/columns" : "row/column/box";
 		}
 	},
 	hiddenSingle: {
-		description: "{square} is the only option for {cand} in its {houseType}, so it has to be {cand-echo}",
+		description: "{square} is the only option for {cand} in its {houseType}",
 	    recipe: {
 		    square: {
 	    		type: "singleSquare"
@@ -562,13 +571,15 @@ S.techs = {
 			var sqr = sud.sqrs[ingr.square],
 			    house;
 			if (S.sqr.canBe(sqr,ingr.cand)!==S.C.success){
-				throw Error("Chosen square cannot be "+ingr.cand+"!");
+				return {msg:"Chosen square cannot be "+ingr.cand+"!",squares:[ingr.square]};
 			}
 			house = sud.houses[sqr[ingr.houseType]];
 			if (house.pos[ingr.cand].length > 1){
-				throw Error("Other squares in the house can also be "+cand+"!");
+				return {msg:"There are other possibilities for "+ingr.cand+" in the "+typenames[ingr.houseType]+"!",squares:Array.filter(house.pos[ingr.cand],ingr.square)};
 			}
-			return S.C.success;
+		},
+		highlight: function(sud,ingr){
+			return ingr.square && ingr.houseType ? [sud.sqrs[ingr.square][ingr.houseType]] : [];
 		},
 		find: function(sud){
 			for(var hid in sud.houses){
@@ -586,7 +597,7 @@ S.techs = {
 		}
 	},
 	nakedSingle: {
-		description: "The only candidate for {square} is {cand}, so {target-echo} has to be {cand-echo}",
+		description: "The only candidate for {square} is {cand}",
 		recipe: {
 		    square: {
 	    		type: "singleSquare"
@@ -607,16 +618,18 @@ S.techs = {
 				}
 			}
 		},
+		highlight: function(){
+			return [];
+		},
 		check: function(sud,ingr){
 			var sqr = sud.sqrs[ingr.square],
 			    rmn = S.sqr.possibleCands(sqr);
 			if (S.sqr.canBe(sqr,ingr.cand)!==S.C.success){
-				throw Error("Target square cannot be "+ingr.cand+"!");
+				return {msg:"Target square cannot be "+ingr.cand+"!",squares:[ingr.square]};
 			}
 			if (rmn.length>1){
-				throw Error("Target square has more possibilities!");
+				return {msg:"Target square has other candidate possibilities too!",squares:[ingr.square]};
 			}
-			return S.C.success;
 		},
 		result: function(sud,ingr){
 			return {answers:[ingr.square,ingr.cand]};
@@ -624,7 +637,7 @@ S.techs = {
 	},
 	hiddenSubset: {
 		description: "{subset} are the only options in their {houseType} for {cands}"+
-		             "meaning other options for those candidates in the {houseType-echo} can be ruled out",
+		             "meaning other options for those candidates can be ruled out",
 		recipe: {
 			subset: {
 				type: "square",
@@ -640,28 +653,50 @@ S.techs = {
 				type: "singleHouseType"
 			}
 		},
+		highlight: function(sud,ingr){
+			return ingr.subset && ingr.houseType && ingr.subset[ingr.houseType].length == 1 ? [ingr.subset[ingr.houseType][0]] : [];
+		},
 		check: function(sud,ingr){
 			var sel = ingr.subset, othersqrs, othersel;
 			if (sel[ingr.houseType].length > 1){
-				throw Error("Squares do not share that housetype!");
+				return {
+					msg: "Chosen squares do not share " + typenames[ingr.houseType] + "!",
+					squares: sel.sqrs
+				};
 			}
 			if (sel.sqrs.length !== ingr.cands.length){
-				throw Error("Must be equal number of squares and candidates!");
+				return {
+					msg: "Must be equal number of squares and candidates!"
+				};
 			}
+			var faulty = [];
 			sel.sqrs.map(function(sqrid){
 				if (Array.common(ingr.cands,S.sqr.possibleCands(sud.sqrs[sqrid])).length === 0){
-					throw Error("Subset contains square(s) without any of the candidates!");
+					faulty.push(sqrid);
 				}
 			});
+			if (faulty.length){
+				return {
+					msg: "Subset contains squares with no possibilities for any of the chosen candidates!",
+					squares: faulty
+				};
+			}
 			if (Array.equal(sel.includedCands,ingr.cands)){
-				throw Error("Subset contains no other candidates, so nothing will be blocked!");
+				return {msg:"Subset contains no other candidates, so nothing will be blocked!",squares:sel.sqrs};
 			}
 			othersqrs = Array.filterAll(S.house.sqrs[sel[ingr.houseType][0]],sel.sqrs);
 			othersel = S.sel(sud,othersqrs);
-			if (Array.common(ingr.cands,othersel.includedCands).length){
-				throw Error("Candidate(s) exist among other squares in that house!");
+			faulty = [];
+			ingr.cands.map(function(c){
+				faulty = faulty.concat(othersel.pos[c]);
+			});
+			faulty = Array.unique(faulty);
+			if (faulty.length){
+				return {
+					msg: "There are other possibilities in the " + typenames[ingr.houseType] + " for some of the chosen candidates!",
+					squares: faulty
+				};
 			}
-			return S.C.success;
 		},
 		result: function(sud,ingr){
 			var res = {blocks:[]};
@@ -745,23 +780,44 @@ S.techs = {
 				type: "singleHouseType"
 			}
 		},
+		highlight: function(sud,ingr){
+			return S.techs.hiddenSubset.highlight(sud,ingr);
+		},
 		check: function(sud,ingr){
-			var sel = ingr.subset, othersqrs, othersel;
+			var sel = ingr.subset, othersqrs, othersel, faulty;
 			if (sel[ingr.houseType].length > 1){
-				throw Error("Squares do not share that housetype!");
+				return {
+					msg: "Chosen squares do not share " + typenames[ingr.houseType] + "!",
+					squares: sel.sqrs
+				};
 			}
 			if (sel.sqrs.length !== ingr.cands.length){
-				throw Error("Must be equal number of squares and candidates!");
+				return {
+					msg: "Must be equal number of squares and candidates!"
+				};
 			}
-			if (!Array.equal(sel.includedCands,ingr.cands)){
-				throw Error("Subset contains other candidates!");
+			// -----
+			faulty = [];
+			(Array.filterAll(ALLCANDS,ingr.cands)).map(function(c){
+				if (sel.pos[c].length){
+				    faulty = faulty.concat(sel.pos[c]);
+				}
+			});
+			faulty = Array.unique(faulty);
+			if (faulty.length){
+				return {
+					msg: "Subset contains possibilities for other candidates!",
+					squares: faulty
+				};
 			}
+			// ----
 			othersqrs = Array.filterAll(S.house.sqrs[sel[ingr.houseType][0]],sel.sqrs);
 			othersel = S.sel(sud,othersqrs);
 			if (Array.common(othersel.includedCands,ingr.cands).length === 0){
-				throw Error("Candidates aren't found in the other squares, so nothing will be blocked!");
+				return {
+					msg: "None of the other squares in the "+typenames[ingr.houseType]+" contain possibilities for the chosen candidates, so nothing will be blocked!"
+				};
 			}
-			return S.C.success;
 		},
 		result: function(sud,ingr){
 			var res = {blocks:[]},
@@ -852,28 +908,46 @@ S.techs = {
 				oneboxwith: "candsin"
 			}
 		},
+		highlight: function(sud,ingr){
+			var houses = [];
+			if (ingr.squares){
+				if (ingr.candsin && ingr.squares[ingr.candsin].length === 1){
+					houses.push(ingr.squares[ingr.candsin][0]);
+				}
+                if (ingr.deletefrom && ingr.squares[ingr.deletefrom].length === 1){
+					houses.push(ingr.squares[ingr.deletefrom][0]);
+				}
+			}
+			return houses;
+		},
 		check: function(sud,ingr){
 			var candsinOtherSqrs,deletefromOtherSqrs,candsinHID, deletefromHID;
 			if ((ingr.candsin !== "b" && ingr.deletefrom !== "b") || (ingr.candsin === "b" && ingr.deletefrom === "b")){
-				throw Error("Must select row and box or column and box!");
+				return {msg:"Must select row and box or column and box!",ingr:["candsin","deletefrom"]};
 			}
 			if (ingr.squares[ingr.candsin].length !== 1){
-				throw Error("Chosen squares do not share that house!");
+				return {msg:"Chosen squares do not share a "+typenames[ingr.candsin]+"!",squares:ingr.squares.sqrs,ingr:["candsin"]};
 			}
 			if (ingr.squares[ingr.deletefrom].length !== 1){
-				throw Error("Chosen squares do not share that house!");
+				return {msg:"Chosen squares do not share a "+typenames[ingr.deletefrom]+"!",squares:ingr.squares.sqrs,ingr:["deletefrom"]};
 			}
 			candsinHID = sud.sqrs[ingr.squares.sqrs[0]][ingr.candsin];
 			candsinOtherSqrs = S.sel(sud,Array.filterAll(S.house.sqrs[candsinHID],ingr.squares.sqrs));
 			if (candsinOtherSqrs.includedCands.indexOf(ingr.cand)!==-1){
-				throw Error("Other squares in "+candsinHID+" can be "+ingr+cand+"!");
+				return {
+					msg: "There are other possibilities in the " + typenames[ingr.candsin] + " for " + ingr.cand + "!",
+					ingr: ["cand", "candsin"],
+					squares: candsinOtherSqrs.pos[ingr.cand]
+				};
 			}
 			deletefromHID = sud.sqrs[ingr.squares.sqrs[0]][ingr.deletefrom];
 			deletefromOtherSqrs = S.sel(sud,Array.filterAll(S.house.sqrs[deletefromHID],ingr.squares.sqrs));
-			if (deletefromOtherSqrs.includedCands.indexOf(ingr.cand)===-1){
-				throw Error("No square in "+deletefromHID+" can be "+ingr.cand+", so nothing will be blocked!");
+			if (deletefromOtherSqrs.includedCands.indexOf(ingr.cand) === -1) {
+				return {
+					msg: "There are no possibilities for " + ingr.cand + " in the " + typenames[ingr.deletefrom] + ", so nothing will be blocked!",
+					ingr: ["cand", "deletefrom"]
+				};
 			}
-			return S.C.success;
 		},
 		find: function(sud){
 			// first type
@@ -937,7 +1011,7 @@ S.techs = {
 	},
 	fish: {
 		description: "{sel} are the only options for {cand} in their {orientation}, "+
-		             "meaning the other options for {cand-echo} in the intersecting {antiorientation} "+
+		             "meaning the other options in the intersecting {antiorientation} "+
 					 "can be ruled out",
 		recipe: {
 			cand: {
@@ -957,6 +1031,9 @@ S.techs = {
 			sel: {
 				type: "square"
 			}
+		},
+		highlight: function(sud,ingr){
+			return ingr.sel ? ingr.sel.r.concat(ingr.sel.c) : [];
 		},
 		result: function(sud,ingr){
             var targetsqrids = [],res = {blocks:[]};
