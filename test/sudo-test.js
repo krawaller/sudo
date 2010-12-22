@@ -1130,33 +1130,72 @@ TestCase("Tech ingredients checker",{
 	"test should be defined": function(){
 		assertFunction(S.techs.check);
 	},
-	"test should return S.C.success": function(){
+	"test should return undefined if no problems": function(){
 		var sud = S.sud(), ingr = {}, recipe = {};
-		assertEquals(S.C.success,S.techs.check(sud,ingr,recipe));
+		assertUndefined(S.techs.check(sud,ingr,recipe));
 	},
-	"test should throw error if some ingredients are missing": function(){
-		var sud = S.sud(), ingr = {foo:"bar"}, recipe = {foo:{type:"moo"},baz:{type:"wee"}};
-		assertException(function(){
-			S.techs.check(sud, ingr, recipe);
-		});
+	"test should return error if some ingredients are missing": function(){
+		var sud = S.sud(), ingr = {foo:"bar"}, recipe = {foo:{type:"moo"},woot:{type:"wee"},baz:{type:"wuu"}},
+		    exp = {
+				msg: "Some ingredients are missing!",
+				ingr: ["woot","baz"]
+			};
+		assertEquals(exp,S.techs.check(sud, ingr, recipe));
 	},
-	"test should throw error if collection has too few members": function(){
+	"test should return error if collection has too few members": function(){
 		var sud = S.sud(),
-		    recipe = {foo:{type:"square",min:3}},
-			ingr = {};
+		    recipe = {foo:{type:"square",min:3},bar:{type:"square",min:3}},
+			ingr = {},
+			exp = {
+				msg: "You have selected too few!",
+				ingr: ["foo"]
+			};
 		ingr.foo = S.sel(sud,["r1c1b1","r1c2b1"]);
-		assertException(function(){
-			S.techs.check(sud, ingr, recipe);
-		});
+		ingr.bar = S.sel(sud,["r1c1b1","r1c2b1","r1c3b1"]);
+		assertEquals(exp,S.techs.check(sud, ingr, recipe));
 	},
-	"test should throw error if collection has too many members": function(){
+	"test should return error if collection has too many members": function(){
 		var sud = S.sud(),
 		    recipe = {foo:{type:"square",max:2}},
-			ingr = {};
+			ingr = {},
+			exp = {
+				msg: "You have selected too many!",
+				ingr: ["foo"]
+			};
 		ingr.foo = S.sel(sud,["r1c1b1","r1c2b1","r1c3b1"]);
-		assertException(function(){
-			S.techs.check(sud, ingr, recipe);
-		});
+		assertEquals(exp,S.techs.check(sud, ingr, recipe));
+	},
+	"test should return error if oneboxwith isn't fulfilled": function(){
+		var sud = S.sud(),
+		    recipe = S.techs.lockedCandidates.recipe,
+			ingr = {
+				squares: S.sel(sud,["r1c1b1","r1c2b1"]),
+				cand: 5,
+				candsin: "r",
+				deletefrom: "c"
+			},
+			exp = {
+				msg: "You must select row & box or column & box!",
+				ingr: ["candsin","deletefrom"]
+			};
+		assertEquals(exp,S.techs.check(sud,ingr,recipe));
+		ingr.candsin = "b";
+		ingr.deletefrom = "b";
+		assertEquals(exp,S.techs.check(sud,ingr,recipe));
+	},
+	"test should not return error for correct oneboxwith": function(){
+		var sud = S.sud(),
+		    recipe = S.techs.lockedCandidates.recipe,
+			ingr = {
+				squares: S.sel(sud,["r1c1b1","r1c2b1"]),
+				cand: 5,
+				candsin: "r",
+				deletefrom: "b"
+			};
+		assertUndefined(S.techs.check(sud,ingr,recipe));
+		ingr.candsin = "b";
+		ingr.deletefrom = "c";
+		assertUndefined(S.techs.check(sud,ingr,recipe));
 	}
 });
 
@@ -1406,7 +1445,11 @@ TestCase("Hidden single ingredients checker",{
 				cand: 5,
 				square: "r1c1b1"
 			},
-			exp = {msg:"Chosen square cannot be 5!",squares:["r1c1b1"]};
+			exp = {
+				msg:"Chosen square cannot be 5!",
+				sqrids:["r1c1b1"],
+				ingr:["cand","square"]
+			};
 		S.sud.block(sud,"r1c1b1",5,"m");
 		assertEquals(exp,S.techs.hiddenSingle.check(sud,ingr));
 	},
@@ -1417,7 +1460,11 @@ TestCase("Hidden single ingredients checker",{
 				square: "r1c1b1",
 				houseType: "b"
 			},
-			exp = {msg:"There are other possibilities for 5 in the box!",squares:["r1c2b1","r1c3b1","r2c1b1","r2c2b1","r2c3b1","r3c1b1","r3c2b1","r3c3b1"]};
+			exp = {
+				msg:"There are other possibilities for 5 in the box!",
+				sqrids:["r1c2b1","r1c3b1","r2c1b1","r2c2b1","r2c3b1","r3c1b1","r3c2b1","r3c3b1"],
+				ingr:["cand"]
+			};
 		assertEquals(exp,S.techs.hiddenSingle.check(sud,ingr));
 	},
 	"test should return nothing for correct selection": function(){
@@ -1540,7 +1587,11 @@ TestCase("Naked single ingredients checker",{
 				square: sqrid,
 				cand: 1
 			},
-			exp= {msg:"Target square cannot be 1!",squares:[sqrid]};
+			exp= {
+				msg:"Target square cannot be 1!",
+				sqrids:[sqrid],
+				ingr: ["cand","square"]
+			};
 		S.sud.block(sud,sqrid,1,"m");
 		assertEquals(exp,S.techs.nakedSingle.check(sud,ingr));
 	},
@@ -1551,7 +1602,11 @@ TestCase("Naked single ingredients checker",{
 				square: sqrid,
 				cand: 1
 			},
-			exp= {msg:"Target square has other candidate possibilities too!",squares:[sqrid]};
+			exp= {
+				msg:"Target square has other candidate possibilities too!",
+				sqrids:[sqrid],
+				ingr: ["square"]
+			};
 		assertEquals(exp,S.techs.nakedSingle.check(sud,ingr));
 	},
 	"test should return nothing for correct selection": function(){
@@ -1656,26 +1711,32 @@ TestCase("Hidden Subset checker",{
 		    squares = ["r1c1b1","r2c1b1"],
 		    sel = S.sel(sud,squares),
 			ingr = {subset:sel,houseType: "r"},
-			exp = {msg:"Chosen squares do not share row!",squares:squares};
+			exp = {
+				msg:"Chosen squares do not share row!",
+				sqrids:squares,
+				ingr: ["houseType","subset"]
+			};
 		assertEquals(exp,S.techs.hiddenSubset.check(sud,ingr));
 	},
-	"test should throw error if not same number of squares and cands": function(){
+	"test should return error if not same number of squares and cands": function(){
 		var sud = S.sud(), squares = ["r1c1b1", "r2c1b1"], sel = S.sel(sud, squares), ingr = {
 			subset: sel,
 			houseType: "c",
 			cands: [1, 2, 3]
 		}, exp = {
-			msg: "Must be equal number of squares and candidates!"
+			msg: "Must be equal number of squares and candidates!",
+			ingr: ["cands","subset"]
 		};
 		assertEquals(exp,S.techs.hiddenSubset.check(sud,ingr));
 	},
-	"test should throw error if included square has none of the candidates": function(){
+	"test should return error if included square has none of the candidates": function(){
         var sud = S.sud(),
 		    sel = S.sel(),
 			cands = [1,2],
 			exp = {
 				msg: "Subset contains squares with no possibilities for any of the chosen candidates!",
-				squares: ["r1c1b1"]
+				sqrids: ["r1c1b1"],
+				ingr: ["cands","subset"]
 			};
 		S.sud.block(sud,"r1c1b1",1,"m");
 		S.sud.block(sud,"r1c1b1",2,"m");
@@ -1689,7 +1750,8 @@ TestCase("Hidden Subset checker",{
 			cands = [1,2],
 			exp = {
 				msg: "There are other possibilities in the row for some of the chosen candidates!",
-				squares: ["r1c3b1","r1c4b2","r1c5b2","r1c6b2","r1c7b3","r1c8b3"]
+				sqrids: ["r1c3b1","r1c4b2","r1c5b2","r1c6b2","r1c7b3","r1c8b3"],
+				ingr: ["cands","houseType"]
 			};
 		S.sud.block(sud,"r1c9b3",1,"m");
 		S.sud.block(sud,"r1c9b3",2,"m");
@@ -1704,7 +1766,8 @@ TestCase("Hidden Subset checker",{
 			cands = [1,2,3],
 			exp = {
 				msg: "Subset contains no other candidates, so nothing will be blocked!",
-				squares: sqrs
+				sqrids: sqrs,
+				ingr:["subset"]
 			};
 		sqrs.map(function(sqrid){
 			[4,5,6,7,8,9].map(function(c){
@@ -1844,7 +1907,8 @@ TestCase("Naked subset checker",{
 			},
 			exp = {
 				msg: "Chosen squares do not share row!",
-				squares: squares
+				sqrids: squares,
+				ingr: ["houseType","subset"]
 			};
 		assertEquals(exp,S.techs.nakedSubset.check(sud,ingr));
 	},
@@ -1858,7 +1922,8 @@ TestCase("Naked subset checker",{
 			    cands: [1,2,3] 
 			},
 			exp = {
-				msg: "Must be equal number of squares and candidates!"
+				msg: "Must be equal number of squares and candidates!",
+				ingr: ["cands","subset"]
 			};
 		assertEquals(exp,S.techs.nakedSubset.check(sud,ingr));
 	},
@@ -1871,7 +1936,8 @@ TestCase("Naked subset checker",{
 			},
 			exp = {
 				msg: "Subset contains possibilities for other candidates!",
-				squares: ["r1c1b1","r2c1b1"]
+				sqrids: ["r1c1b1","r2c1b1"],
+				ingr: ["subset"]
 			};
 		[4,5,6,7,8,9].map(function(c){
 			S.sud.block(sud,"r3c1b1",c,"m");
@@ -1885,7 +1951,9 @@ TestCase("Naked subset checker",{
 			cands = [1,2],
 			othercands = [3,4,5,6,7,8,9],
 			exp = {
-				msg: "None of the other squares in the row contain possibilities for the chosen candidates, so nothing will be blocked!"
+				msg: "None of the other squares in the row contain possibilities for the chosen candidates, so nothing will be blocked!",
+				ingr: ["cands"],
+				sqrids: ["r1c3b1","r1c4b2","r1c5b2","r1c6b2","r1c7b3","r1c8b3","r1c9b3"]
 			};
 		othercands.map(function(c){
 			S.sud.block(sud,"r1c1b1",c,"m");
@@ -2058,21 +2126,6 @@ TestCase("Locked candidates checker",{
 	"test should be defined":function(){
 		assertFunction(S.techs.lockedCandidates.check);
 	},
-    "test should return error if don't select row/box or col/box": function(){
-		var sud = S.sud(),
-		    sqrids = ["r1c1b1","r1c9b3"],
-		    ingr = {
-				cand: 5,
-				candsin: "r",
-				deletefrom: "c",
-				squares: S.sel(sud,sqrids) 
-			},
-			exp = {
-				msg: "Must select row and box or column and box!",
-				ingr: ["candsin","deletefrom"]
-			};
-		assertEquals(exp,S.techs.lockedCandidates.check(sud,ingr));
-	},
 	"test should return error if not all squares share candsin house": function(){
 		var sud = S.sud(),
 		    sqrids = ["r1c1b1","r1c9b3"],
@@ -2084,7 +2137,7 @@ TestCase("Locked candidates checker",{
 			},
 			exp = {
 				msg: "Chosen squares do not share a column!",
-				squares: sqrids,
+				sqrids: sqrids,
 				ingr: ["candsin"]
 			};
 		assertEquals(exp,S.techs.lockedCandidates.check(sud,ingr));
@@ -2100,7 +2153,7 @@ TestCase("Locked candidates checker",{
 			},
 			exp = {
 				msg: "Chosen squares do not share a box!",
-				squares: sqrids,
+				sqrids: sqrids,
 				ingr: ["deletefrom"]
 			};
 		assertEquals(exp,S.techs.lockedCandidates.check(sud,ingr));
@@ -2115,7 +2168,7 @@ TestCase("Locked candidates checker",{
 			},
 			exp = {
 				msg: "There are other possibilities in the row for 5!",
-				squares: ["r1c3b1","r1c4b2","r1c5b2","r1c6b2","r1c7b3","r1c8b3","r1c9b3"],
+				sqrids: ["r1c3b1","r1c4b2","r1c5b2","r1c6b2","r1c7b3","r1c8b3","r1c9b3"],
 				ingr: ["cand","candsin"]
 			};
 		assertEquals(exp,S.techs.lockedCandidates.check(sud,ingr));
@@ -2129,8 +2182,9 @@ TestCase("Locked candidates checker",{
 				squares: S.sel(sud,["r1c1b1","r1c2b1"])
 			},
 			exp = {
-				msg: "There are no possibilities for 5 in the box, so nothing will be blocked!",
-				ingr: ["cand","deletefrom"]
+				msg: "There are no possibilities for 5 in the rest of the box, so nothing will be blocked!",
+				ingr: ["cand","deletefrom"],
+				sqrids: ["r2c1b1","r2c2b1","r2c3b1","r3c1b1","r3c2b1","r3c3b1"]
 			};
 		(Array.filterAll(S.house.sqrs.r1,ingr.squares.sqrs)).map(function(sqrid){
 			S.sud.block(sud,sqrid,5,"m");
@@ -2296,8 +2350,13 @@ TestCase("fish checker",{
 	"test should be defined": function(){
 		assertFunction(S.techs.fish.check);
 	},
-	"test should throw error if not all squares contain cand": function(){
-		var sud = S.sud(), sel, cand = 5, ingr;
+	"test should return error if not all squares contain cand": function(){
+		var sud = S.sud(), sel, cand = 5, ingr,
+		exp = {
+			msg: "Not all selected squares can be 5!",
+			ingr: ["cand","sel"],
+			sqrids: ["r1c1b1"]
+		};
 		S.sud.block(sud,"r1c1b1",cand,"m");
 		sel = S.sel(sud,["r1c1b1","r1c5b2","r5c1b4","r5c5b5"]);
 		ingr = {
@@ -2305,36 +2364,45 @@ TestCase("fish checker",{
 			orientation: "r",
 			sel: sel
 		};
-		assertException(function(){
-			S.techs.fish.check(sud,ingr);
-		});
+		assertEquals(exp,S.techs.fish.check(sud,ingr));
 	},
 	"test should throw error if not same number of cols and rows": function(){
-        var sud = S.sud(), sel, cand = 5, ingr;
+        var sud = S.sud(), sel, cand = 5, ingr,
+		exp = {
+			msg: "Squares must share same number of rows and columns!",
+			ingr: ["sel"]
+		};
 		sel = S.sel(sud,["r1c1b1","r1c5b2","r6c1b4","r5c5b5"]);
 		ingr = {
 			cand: cand,
 			orientation: "r",
 			sel: sel
 		};
-		assertException(function(){
-			S.techs.fish.check(sud,ingr);
-		});
+		assertEquals(exp,S.techs.fish.check(sud,ingr));
 	},
-	"test should throw error if other squares in [orientation] can have cand": function(){
-		var sud = S.sud(), sel = S.sel(sud,["r1c1b1","r1c5b2","r5c1b4","r5c5b5"]), cand = 5, ingr;
+	"test should return error if other squares in [orientation] can have cand": function(){
+		var sud = S.sud(), sel = S.sel(sud,["r1c1b1","r1c5b2","r5c1b4","r5c5b5"]), cand = 5,
 		ingr = {
 			cand: cand,
 			orientation: "r",
 			sel: sel
+		},
+		exp = {
+			msg:"There are other possibilities for 5 in those rows!",
+			sqrids: ["r1c2b1","r1c3b1","r1c4b2","r1c6b2","r1c7b3","r1c8b3","r5c2b4","r5c3b4","r5c4b5","r5c6b5","r5c7b6","r5c8b6","r5c9b6"]
 		};
-		assertException(function(){
-			S.techs.fish.check(sud,ingr);
-		});
+		S.sud.block(sud,"r1c9b3",cand,"m");
+		assertEquals(exp,S.techs.fish.check(sud,ingr));
 	},
-	"test should throw error if no squares in [nonorientation] can have cand": function(){
+	"test should return error if no squares in [nonorientation] can have cand": function(){
 		var sud = S.sud(),
-		    sqrids = ["r1c1b1","r1c5b2","r5c1b4","r5c5b5"], cand = 5, ingr, sel;
+		    sqrids = ["r1c1b1","r1c5b2","r5c1b4","r5c5b5"], cand = 5, ingr, sel,
+		exp = {
+			msg: "There are no other possibilities for 5 in those columns, so nothing will be blocked!",
+			sqrids: ["r2c1b1","r3c1b1","r4c1b4","r6c1b4","r7c1b7","r8c1b7","r9c1b7",
+			         "r2c5b2","r3c5b2","r4c5b5","r6c5b5","r7c5b8","r8c5b8","r9c5b8"],
+			ingr: ["cand","orientation"]
+		};
 	    Array.filterAll(S.house.sqrs.r1.concat(S.house.sqrs.r5),sqrids).map(function(sqrid){
 			S.sud.block(sud,sqrid,cand,"m");
 		});
@@ -2346,11 +2414,9 @@ TestCase("fish checker",{
 			orientation: "r",
 			sel: S.sel(sud,sqrids)
 		};
-		assertException(function(){
-			S.techs.fish.check(sud,ingr);
-		});
+		assertEquals(exp,S.techs.fish.check(sud,ingr));
 	},
-	"test should not throw error for correct ingredients": function(){
+	"test should return nothing for correct ingredients": function(){
         var sud = S.sud(),
 		    sqrids = ["r1c1b1","r1c5b2","r5c1b4","r5c5b5"], cand = 5, ingr, sel;
 	    Array.filterAll(S.house.sqrs.r1.concat(S.house.sqrs.r5),sqrids).map(function(sqrid){
@@ -2361,9 +2427,7 @@ TestCase("fish checker",{
 			orientation: "r",
 			sel: S.sel(sud,sqrids)
 		};
-		assertNoException(function(){
-			S.techs.fish.check(sud,ingr);
-		});
+		assertUndefined(S.techs.fish.check(sud,ingr));
 	}
 });
 
