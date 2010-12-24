@@ -1229,7 +1229,7 @@ S.UI = {
 		}
 		sud.currentTech = tech;
 		sud.pickedIngredients = {};
-		for (var i in S.techs[tech].recipe){
+		for (var i in S.techs[tech].recipe){ // fake loop to get first ingredient
 			S.UI.selectIngredient(sud,i);
 			return;
 		}
@@ -1301,5 +1301,21 @@ S.UI = {
 				}
 			    break;
 		}
+	}
+};
+
+/******************************* RENDERING CODE ************************/
+
+S.render = {
+	ingredient: function(ingredientid,recipe,cauldron,selected){
+		return "<div class='ingredient" + (selected ? " selected" : "") + "' id='" + ingredientid + "'>" + S.techs.describeIngredient(ingredientid, recipe, cauldron) + "</div>";
+	},
+	techDescription: function(sud){
+		var tech = S.techs[sud.currentTech], ret = tech.description;
+		ret.match(/\{[^\}]{1,}\}/g).map(function(i){
+			var ingredientid = i.substr(1,i.length-2);
+			ret = ret.replace(i,S.render.ingredient(ingredientid,tech.recipe,sud.pickedIngredients,ingredientid === sud.currentIngredient));
+		});
+		return "<div id='techdescription'>"+ret+"</div>";
 	}
 };

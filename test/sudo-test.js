@@ -2670,3 +2670,52 @@ TestCase("UI pickIngredient receiving houseType",{
 		assertEquals({deletefrom:"b"},sud.pickedIngredients);
 	}
 });
+
+
+/*************************** RENDERER ******************************/
+
+TestCase("Render object definition",{
+	"test should be defined": function(){
+		assertObject(S.render);
+	}
+});
+
+
+TestCase("Ingredient renderer",{
+	"test should be defined": function(){
+		assertFunction(S.render.ingredient);
+	},
+	"test should call describeIngredient": function(){
+		var sud = S.sud(),
+		    recipe = S.techs.hiddenSingle.recipe,
+		    exp = "<div class='ingredient' id='square'>"+S.techs.describeIngredient("square",recipe,{})+"</div>";
+		assertEquals(exp, S.render.ingredient("square",recipe,{}));
+	},
+	"test should add selected class if ingredient is selected": function(){
+		var sud = S.sud(),
+		    recipe = S.techs.hiddenSingle.recipe,
+		    exp = "<div class='ingredient selected' id='square'>"+S.techs.describeIngredient("square",recipe,{})+"</div>";
+		assertEquals(exp, S.render.ingredient("square",recipe,{},true));
+	}
+});
+
+TestCase("Tech description renderer",{
+	"test should be defined": function(){
+		assertFunction(S.render.techDescription);
+	},
+	"test should render correct description":function(){
+		var sud = S.sud(), 
+		    tech = S.techs.hiddenSingle,
+			recipe = tech.recipe,
+			exp = S.techs.hiddenSingle.description;
+		S.UI.selectTech(sud,"hiddenSingle");
+		S.UI.selectIngredient(sud,"square");
+		exp.match(/\{[^\}]{1,}\}/g).map(function(i){
+			var ingredientid = i.substr(1,i.length-2);
+			exp = exp.replace(i,S.render.ingredient(ingredientid,recipe,sud.pickedIngredients,ingredientid === "square"));
+		});
+		exp = "<div id='techdescription'>"+exp+"</div>";
+		assertEquals(exp, S.render.techDescription(sud));
+	}
+});
+
