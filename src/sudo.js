@@ -497,6 +497,7 @@ for(var r=1; r<=9; r++){
 /********************************** Tech code ********************************/
 
 S.techs = {
+	list: ["nakedSingle","hiddenSingle","nakedSubset","hiddenSubset","lockedCandidates","fish"],
 	check: function(sud,ingr,recipe){
 		var missing = {
 			msg: "Some ingredients are missing!",
@@ -573,6 +574,7 @@ S.techs = {
 		}
 	},
 	hiddenSingle: {
+		name: "Hidden Single",
 		description: "{square} is the only option for {cand} in its {houseType}",
 	    recipe: {
 		    square: {
@@ -626,6 +628,7 @@ S.techs = {
 		}
 	},
 	nakedSingle: {
+		name: "Naked Single",
 		description: "The only candidate for {square} is {cand}",
 		recipe: {
 		    square: {
@@ -673,6 +676,7 @@ S.techs = {
 		}
 	},
 	hiddenSubset: {
+		name: "Hidden Subset",
 		description: "{subset} are the only options in their {houseType} for {cands}"+
 		             "meaning other options for those candidates can be ruled out",
 		recipe: {
@@ -808,6 +812,7 @@ S.techs = {
 		}
 	},
 	nakedSubset: {
+		name: "Naked Subset",
 		description: "{subset} can only be {cands}"+
 		             "meaning other options for those candidates in the shared {houseType} can be ruled out",
 		recipe: {
@@ -938,6 +943,7 @@ S.techs = {
 		}
 	},
 	lockedCandidates: {
+		name: "Locked Candidates",
 		description: "{squares} are the only options for {cand} in their {candsin}, meaning all other options "+
 		             "in the intersecting {deletefrom} can be ruled out",
 		recipe: {
@@ -1070,6 +1076,7 @@ S.techs = {
 		}
 	},
 	fish: {
+		name: "Fish",
 		description: "{sel} are the only options for {cand} in their {orientation}, "+
 		             "meaning the other options in the intersecting {antiorientation} "+
 					 "can be ruled out",
@@ -1228,7 +1235,7 @@ S.UI = {
 			throw Error("Unknown tech \""+tech+"\"!");
 		}
 		sud.currentTech = tech;
-		sud.pickedIngredients = {};
+		sud.cauldron = {};
 		for (var i in S.techs[tech].recipe){ // fake loop to get first ingredient
 			S.UI.selectIngredient(sud,i);
 			return;
@@ -1252,22 +1259,22 @@ S.UI = {
 			return;
 		}
 		var ingr = S.techs[sud.currentTech].recipe[sud.currentIngredient],
-		    picked = sud.pickedIngredients[sud.currentIngredient];
+		    picked = sud.cauldron[sud.currentIngredient];
 		switch(type){
 			case "houseType":
 			    if (ingr.type === "singleHouseType" && !(ingr.notbox && id === "b")){
 					if (ingr.anti) {
-						sud.pickedIngredients[ingr.anti] = {r:"c",c:"r"}[id];
+						sud.cauldron[ingr.anti] = {r:"c",c:"r"}[id];
 					}
 					else {
-						sud.pickedIngredients[sud.currentIngredient] = id;
+						sud.cauldron[sud.currentIngredient] = id;
 						if (ingr.oneboxwith){
 							if (id != "b"){
-								sud.pickedIngredients[ingr.oneboxwith] = "b";
+								sud.cauldron[ingr.oneboxwith] = "b";
 							}
 							else {
-								if (sud.pickedIngredients[ingr.oneboxwith] == "b"){
-									delete sud.pickedIngredients[ingr.oneboxwith];
+								if (sud.cauldron[ingr.oneboxwith] == "b"){
+									delete sud.cauldron[ingr.oneboxwith];
 								}
 							}
 						}
@@ -1276,27 +1283,27 @@ S.UI = {
 			    break;
 			case "cand":
 			    if (ingr.type === "singleCand"){
-					sud.pickedIngredients[sud.currentIngredient] = id;
+					sud.cauldron[sud.currentIngredient] = id;
 				}
 				if (ingr.type === "cand"){
 					if (!picked) {
-						sud.pickedIngredients[sud.currentIngredient] = [id];
+						sud.cauldron[sud.currentIngredient] = [id];
 					}
 					else {
-						sud.pickedIngredients[sud.currentIngredient] = Array.toggle(sud.pickedIngredients[sud.currentIngredient],id);
+						sud.cauldron[sud.currentIngredient] = Array.toggle(sud.cauldron[sud.currentIngredient],id);
 					}
 				}
 			    break;
 			case "square":
 			    if (ingr.type === "singleSquare"){
-					sud.pickedIngredients[sud.currentIngredient] = id;
+					sud.cauldron[sud.currentIngredient] = id;
 				}
                 if (ingr.type === "square"){
 					if (!picked) {
-						sud.pickedIngredients[sud.currentIngredient] = [id];
+						sud.cauldron[sud.currentIngredient] = [id];
 					}
 					else {
-						sud.pickedIngredients[sud.currentIngredient] = Array.toggle(sud.pickedIngredients[sud.currentIngredient],id);
+						sud.cauldron[sud.currentIngredient] = Array.toggle(sud.cauldron[sud.currentIngredient],id);
 					}
 				}
 			    break;
@@ -1310,12 +1317,22 @@ S.render = {
 	ingredient: function(ingredientid,recipe,cauldron,selected){
 		return "<div class='ingredient" + (selected ? " selected" : "") + "' id='" + ingredientid + "'>" + S.techs.describeIngredient(ingredientid, recipe, cauldron) + "</div>";
 	},
-	techDescription: function(sud){
-		var tech = S.techs[sud.currentTech], ret = tech.description;
+	techDescription: function(tech,cauldron,selectedingredientid){
+		var ret = tech.description;
 		ret.match(/\{[^\}]{1,}\}/g).map(function(i){
 			var ingredientid = i.substr(1,i.length-2);
-			ret = ret.replace(i,S.render.ingredient(ingredientid,tech.recipe,sud.pickedIngredients,ingredientid === sud.currentIngredient));
+			ret = ret.replace(i,S.render.ingredient(ingredientid,tech.recipe,cauldron,ingredientid === selectedingredientid));
 		});
 		return "<div id='techdescription'>"+ret+"</div>";
+	},
+	techListItem: function(techname,techid,selected){
+		return "<li class='tech"+(selected?" selected":"")+"' id='"+techid+"'>"+techname+"</li>";
+	},
+	techList: function(selectedtechid){
+        var ret = "";
+		S.techs.list.map(function(i){
+			ret += S.render.techListItem(S.techs[i].name,i,i === selectedtechid);
+		});
+		return "<ul id='techlist'>"+ret+"</ul>";
 	}
 };

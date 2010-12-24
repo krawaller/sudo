@@ -1126,6 +1126,13 @@ TestCase("Tech object",{
 	}
 });
 
+TestCase("Tech List",{
+	"test should be correct": function(){
+		var exp = ["nakedSingle","hiddenSingle","nakedSubset","hiddenSubset","lockedCandidates","fish"];
+		assertEquals(exp,S.techs.list);
+	}
+});
+
 TestCase("Tech ingredients checker",{
 	"test should be defined": function(){
 		assertFunction(S.techs.check);
@@ -1391,6 +1398,9 @@ TestCase("Hidden single tech",{
 	"test should be defined": function(){
 		assertObject(S.techs.hiddenSingle);
 	},
+	"test should have name": function(){
+		assertEquals("Hidden Single",S.techs.hiddenSingle.name);
+	},
 	"test should have description": function(){
 		assertString(S.techs.hiddenSingle.description);
 	},
@@ -1528,6 +1538,9 @@ TestCase("Naked single tech",{
 	"test should be defined": function(){
 		assertObject(S.techs.nakedSingle);
 	},
+    "test should have name": function(){
+		assertEquals("Naked Single",S.techs.nakedSingle.name);
+	},
 	"test should have description": function(){
 		assertString(S.techs.nakedSingle.description);
 	},
@@ -1649,6 +1662,9 @@ TestCase("Naked single reality checker",{ // TODO - fix
 TestCase("Hidden Subset definition",{
 	"test should be defined": function(){
 		assertObject(S.techs.hiddenSubset);
+	},
+    "test should have name": function(){
+		assertEquals("Hidden Subset",S.techs.hiddenSubset.name);
 	},
 	"test should have description": function(){
 		assertString(S.techs.hiddenSubset.description);
@@ -1843,6 +1859,9 @@ TestCase("Naked subset definition",{
 	},
 	"test should have description": function(){
 		assertString(S.techs.nakedSubset.description);
+	},
+    "test should have name": function(){
+		assertEquals("Naked Subset",S.techs.nakedSubset.name);
 	},
 	"test description should contain all ingredients": function(){
 		assertTrue(ensureIngredientsInDescription(S.techs.nakedSubset.description,S.techs.nakedSubset.recipe));
@@ -2059,6 +2078,9 @@ TestCase("Naked subset reality check",{
 TestCase("Locked candidates definition",{
 	"test should be defined": function(){
 		assertObject(S.techs.lockedCandidates);
+	},
+    "test should have name": function(){
+		assertEquals("Locked Candidates",S.techs.lockedCandidates.name);
 	},
 	"test should have description":function(){
 		assertString(S.techs.lockedCandidates.description);
@@ -2323,6 +2345,9 @@ TestCase("fish definition",{
 		};
 		assertEquals(ingr,S.techs.fish.recipe);
 	},
+    "test should have name": function(){
+		assertEquals("Fish",S.techs.fish.name);
+	},
 	"test should have description": function(){
 		assertString(S.techs.fish.description);
 	},
@@ -2501,7 +2526,7 @@ TestCase("UI selectTech function",{
 	"test should set sud picked ingredients prop to empty object": function(){
 		var sud = S.sud(), tech="nakedSingle";
 		S.UI.selectTech(sud,tech);
-		assertEquals({},sud.pickedIngredients);
+		assertEquals({},sud.cauldron);
 	},
 	"test should select first ingredient in tech": function(){
 		var sud = S.sud(), tech="hiddenSingle";
@@ -2546,18 +2571,18 @@ TestCase("UI pickIngredient function",{
 		S.UI.selectTech(sud,"hiddenSingle");
 		S.UI.selectIngredient(sud,"houseType");
 		S.UI.pickIngredient(sud,"cand",5);
-		assertEquals({},sud.pickedIngredients);
+		assertEquals({},sud.cauldron);
 	},
 	"test should do nothing if no tech is selected": function(){
         var sud = S.sud();
 		S.UI.pickIngredient(sud,"cand",5);
-		assertEquals({},sud.pickedIngredients);
+		assertEquals({},sud.cauldron);
 	},
 	"test should do nothing if no ingredient is selected": function(){
         var sud = S.sud();
 		S.UI.selectTech(sud,"hiddenSingle");
 		S.UI.pickIngredient(sud,"cand",5);
-		assertEquals({},sud.pickedIngredients);
+		assertEquals({},sud.cauldron);
 	}
 });
 
@@ -2567,14 +2592,14 @@ TestCase("UI pickIngredient receiving candidate",{
 		S.UI.selectTech(sud,"hiddenSingle");
 		S.UI.selectIngredient(sud,"cand");
 		S.UI.pickIngredient(sud,"cand",5);
-		assertEquals({cand:5},sud.pickedIngredients);
+		assertEquals({cand:5},sud.cauldron);
 	},
 	"test should add first cand to candcollection correctly": function(){
 		var sud = S.sud();
 		S.UI.selectTech(sud,"nakedSubset");
 		S.UI.selectIngredient(sud,"cands");
 		S.UI.pickIngredient(sud,"cand",5);
-		assertEquals({cands:[5]},sud.pickedIngredients);
+		assertEquals({cands:[5]},sud.cauldron);
 	},
 	"test should add second cand to candcollection correctly": function(){
 		var sud = S.sud();
@@ -2582,7 +2607,7 @@ TestCase("UI pickIngredient receiving candidate",{
 		S.UI.selectIngredient(sud,"cands");
 		S.UI.pickIngredient(sud,"cand",5);
 		S.UI.pickIngredient(sud,"cand",6);
-		assertEquals({cands:[5,6]},sud.pickedIngredients);
+		assertEquals({cands:[5,6]},sud.cauldron);
 	},
 	"test should remove existing cand from candcollection correctly": function(){
 		var sud = S.sud();
@@ -2592,7 +2617,7 @@ TestCase("UI pickIngredient receiving candidate",{
 		S.UI.pickIngredient(sud,"cand",6);
 		S.UI.pickIngredient(sud,"cand",7);
 		S.UI.pickIngredient(sud,"cand",6);
-		assertEquals({cands:[5,7]},sud.pickedIngredients);
+		assertEquals({cands:[5,7]},sud.cauldron);
 	}
 });
 
@@ -2602,14 +2627,14 @@ TestCase("UI pickIngredient receiving square",{
 		S.UI.selectTech(sud,"hiddenSingle");
 		S.UI.selectIngredient(sud,"square");
 		S.UI.pickIngredient(sud,"square","r1c1b1");
-		assertEquals({square:"r1c1b1"},sud.pickedIngredients);
+		assertEquals({square:"r1c1b1"},sud.cauldron);
 	},
 	"test should add first square to squarecollection correctly": function(){
 		var sud = S.sud();
 		S.UI.selectTech(sud,"lockedCandidates");
 		S.UI.selectIngredient(sud,"squares");
 		S.UI.pickIngredient(sud,"square","r1c1b1");
-		assertEquals({squares:["r1c1b1"]},sud.pickedIngredients);
+		assertEquals({squares:["r1c1b1"]},sud.cauldron);
 	},
 	"test should add second square to candcollection correctly": function(){
 		var sud = S.sud();
@@ -2617,7 +2642,7 @@ TestCase("UI pickIngredient receiving square",{
 		S.UI.selectIngredient(sud,"squares");
 		S.UI.pickIngredient(sud,"square","r1c1b1");
 		S.UI.pickIngredient(sud,"square","r1c2b1");
-		assertEquals({squares:["r1c1b1","r1c2b1"]},sud.pickedIngredients);
+		assertEquals({squares:["r1c1b1","r1c2b1"]},sud.cauldron);
 	},
 	"test should remove existing square from squarecollection correctly": function(){
 		var sud = S.sud();
@@ -2627,7 +2652,7 @@ TestCase("UI pickIngredient receiving square",{
 		S.UI.pickIngredient(sud,"square","r1c2b1");
 		S.UI.pickIngredient(sud,"square","r1c3b1");
 		S.UI.pickIngredient(sud,"square","r1c2b1");
-		assertEquals({squares:["r1c1b1","r1c3b1"]},sud.pickedIngredients);
+		assertEquals({squares:["r1c1b1","r1c3b1"]},sud.cauldron);
 	}
 });
 
@@ -2637,28 +2662,28 @@ TestCase("UI pickIngredient receiving houseType",{
 		S.UI.selectTech(sud,"hiddenSingle");
 		S.UI.selectIngredient(sud,"houseType");
 		S.UI.pickIngredient(sud,"houseType","r");
-		assertEquals({houseType:"r"},sud.pickedIngredients);
+		assertEquals({houseType:"r"},sud.cauldron);
 	},
 	"test should not pick box if ingredient can't be box": function(){
 		var sud = S.sud();
 		S.UI.selectTech(sud,"fish");
 		S.UI.selectIngredient(sud,"orientation");
 		S.UI.pickIngredient(sud,"houseType","b");
-		assertEquals({},sud.pickedIngredients);
+		assertEquals({},sud.cauldron);
 	},
 	"test should pick other ingredient if anti is set": function(){
 		var sud = S.sud();
 		S.UI.selectTech(sud,"fish");
 		S.UI.selectIngredient(sud,"antiorientation");
 		S.UI.pickIngredient(sud,"houseType","r");
-		assertEquals({orientation:"c"},sud.pickedIngredients);
+		assertEquals({orientation:"c"},sud.cauldron);
 	},
 	"test should set other ingredient to box if oneboxwith is set and nonbox is selected": function(){
 		var sud = S.sud();
 		S.UI.selectTech(sud,"lockedCandidates");
 		S.UI.selectIngredient(sud,"candsin");
 		S.UI.pickIngredient(sud,"houseType","r");
-		assertEquals({candsin:"r",deletefrom:"b"},sud.pickedIngredients);
+		assertEquals({candsin:"r",deletefrom:"b"},sud.cauldron);
 	},
 	"test should clear other ingredient from box if oneboxwith is set and box is selected": function(){
 		var sud = S.sud();
@@ -2667,7 +2692,7 @@ TestCase("UI pickIngredient receiving houseType",{
 		S.UI.pickIngredient(sud,"houseType","b");
 		S.UI.selectIngredient(sud,"deletefrom");
 		S.UI.pickIngredient(sud,"houseType","b");
-		assertEquals({deletefrom:"b"},sud.pickedIngredients);
+		assertEquals({deletefrom:"b"},sud.cauldron);
 	}
 });
 
@@ -2707,15 +2732,41 @@ TestCase("Tech description renderer",{
 		var sud = S.sud(), 
 		    tech = S.techs.hiddenSingle,
 			recipe = tech.recipe,
-			exp = S.techs.hiddenSingle.description;
+			exp = S.techs.hiddenSingle.description,
+			cauldron = {};
 		S.UI.selectTech(sud,"hiddenSingle");
 		S.UI.selectIngredient(sud,"square");
 		exp.match(/\{[^\}]{1,}\}/g).map(function(i){
 			var ingredientid = i.substr(1,i.length-2);
-			exp = exp.replace(i,S.render.ingredient(ingredientid,recipe,sud.pickedIngredients,ingredientid === "square"));
+			exp = exp.replace(i,S.render.ingredient(ingredientid,recipe,cauldron,ingredientid === "square"));
 		});
 		exp = "<div id='techdescription'>"+exp+"</div>";
-		assertEquals(exp, S.render.techDescription(sud));
+		assertEquals(exp, S.render.techDescription(tech,cauldron,"square"));
+	}
+});
+
+TestCase("Tech listitem renderer",{
+	"test should be defined": function(){
+		assertFunction(S.render.techListItem);
+	},
+	"test should wrap name with correct html": function(){
+		assertEquals("<li class='tech' id='lockedCandidates'>Locked Candidates</li>",S.render.techListItem("Locked Candidates","lockedCandidates"));
+	},
+	"test should add selected class if appropriate": function(){
+		assertEquals("<li class='tech selected' id='lockedCandidates'>Locked Candidates</li>",S.render.techListItem("Locked Candidates","lockedCandidates",true));
+	}
+});
+
+TestCase("Tech List renderer",{
+	"test should be defined": function(){
+		assertFunction(S.render.techList);
+	},
+	"test should use tech.list and render.techListItem and return correct list": function(){
+		var ret = "", selectedtechid = "fish";
+		S.techs.list.map(function(i){
+			ret += S.render.techListItem(S.techs[i].name,i,i === selectedtechid);
+		});
+		assertEquals("<ul id='techlist'>"+ret+"</ul>",S.render.techList(selectedtechid));
 	}
 });
 
